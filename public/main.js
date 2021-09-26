@@ -8,25 +8,32 @@ const {
 } = require('electron')
 const path = require('path')
 const pyshell = require('python-shell');
-
+const isDev = require('electron-is-dev')
 // Global PythonShell object -> FLASK server instance
 var ps;
 
 require("@electron/remote/main").initialize()
 function createWindow() {
 
-  ps = new pyshell.PythonShell('./backend/server.py')
 
+  // ps = new pyshell.PythonShell('./backend/server.py')
+  let script = path.join(__dirname, 'backend','dist', 'server.exe')
+  ps = require('child_process').execFile(script)
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
     webPreferences: {
-        enableRemoteModule: true
+        enableRemoteModule: true,
+        nodeIntegration: true
     }
   })
-
-  mainWindow.loadURL('http://localhost:3000')
+  mainWindow.loadURL(
+      isDev
+          ? 'http://localhost:3000'
+          : `file://${path.join(__dirname, '../build/index.html')}`
+  )
+  // mainWindow.loadURL('http://localhost:3000')
 
   mainWindow.webContents.openDevTools()
 
