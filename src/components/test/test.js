@@ -29,7 +29,7 @@ const Test = () => {
     return (
         <Fragment>
             <Button onClick={getData}></Button>
-        {sample && sample.map((r) => {
+        {sample?.data && sample.data.map((r) => {
             return <div>{r}</div>
         })
     }
