@@ -9,16 +9,21 @@ const {
 const path = require('path')
 const pyshell = require('python-shell');
 const isDev = require('electron-is-dev')
+
+
 // Global PythonShell object -> FLASK server instance
 var ps;
 
 require("@electron/remote/main").initialize()
 function createWindow() {
 
-
+  // DEV
   // ps = new pyshell.PythonShell('./backend/server.py')
-  let script = path.join(__dirname, 'backend','dist', 'server.exe')
+
+  //BUILD
+  let script = path.join(__dirname, 'server.exe')
   ps = require('child_process').execFile(script)
+
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 800,
@@ -64,8 +69,17 @@ if (BrowserWindow.getAllWindows().length === 0) createWindow()
 app.on('window-all-closed', function () {
 
   // KILLING PYTHON SERVER
-  ps.childProcess.kill(); 
-
+  //DEV
+  // ps.childProcess.kill();
+  const { exec } = require('child_process');
+  exec('taskkill /f /t /im server.exe', (err, stdout, stderr) => {
+    if (err) {
+      console.log(err)
+      return;
+    }
+    console.log(`stdout: ${stdout}`);
+    console.log(`stderr: ${stderr}`);
+  });
   if (process.platform !== 'darwin') app.quit()
 })
 

@@ -28,7 +28,7 @@ const Test = () => {
     }
     return (
         <Fragment>
-            <Button onClick={getData}></Button>
+            <Button onClick={getData}>Dane z server</Button>
         {sample?.data && sample.data.map((r) => {
             return <div>{r}</div>
         })
