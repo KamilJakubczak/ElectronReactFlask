@@ -1,77 +1,60 @@
-
-// main.js
-
-// Modules to control application life and create native browser window
-const {
-  app,
-  BrowserWindow
-} = require('electron')
+const {app, BrowserWindow, Menu, Tray} = require('electron')
 const path = require('path')
 const pyshell = require('python-shell');
 const isDev = require('electron-is-dev')
-
-
-// Global PythonShell object -> FLASK server instance
-var ps;
+const { exec } = require('child_process');
 
 require("@electron/remote/main").initialize()
+
+// Global PythonShell object -> FLASK server instance
+let backendServer;
+let mainWindow;
+let tray; /* Required as global variable in other case tray icon will disappear
+ after couple of seconds due to garbage collection */
+
+app.on('ready', createWindow)
+
+app.on('window-all-closed', handleQuit)
+
+app.whenReady().then(createTray)
+
 function createWindow() {
+  setStartBackendServer()
+  mainWindow = createMainWindow()
+  mainWindow.loadURL(getUrl())
+  mainWindow.webContents.openDevTools()
+  mainWindow.on('minimize', handleMinimize);
+  mainWindow.on('close', handleClose);
+}
 
-  // DEV
-  // ps = new pyshell.PythonShell('./backend/server.py')
-
-  //BUILD
-  let script = path.join(__dirname, 'server.exe')
-  ps = require('child_process').execFile(script)
-
-  // Create the browser window.
-  const mainWindow = new BrowserWindow({
+function createMainWindow() {
+  return new BrowserWindow({
     width: 800,
     height: 600,
     webPreferences: {
-        enableRemoteModule: true,
-        nodeIntegration: true
+      enableRemoteModule: true,
+      nodeIntegration: true
     }
   })
-  mainWindow.loadURL(
-      isDev
-          ? 'http://localhost:3000'
-          : `file://${path.join(__dirname, '../build/index.html')}`
-  )
-  // mainWindow.loadURL('http://localhost:3000')
-
-  mainWindow.webContents.openDevTools()
-
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-// app.whenReady().then(() => {
-//   const ps = createWindow()
+function createTray() {
 
-//   app.on('activate', function () {
-//     // On macOS it's common to re-create a window in the app when the
-//     // dock icon is clicked and there are no other windows open.
-//     if (BrowserWindow.getAllWindows().length === 0) createWindow()
-//   })
-// })
-app.on('ready', createWindow)
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
+  tray = new Tray(path.join(__dirname, 'spinner.png'));
+  const contextMenu = Menu.buildFromTemplate([
+    { label: 'Show App', click:  function(){
+        mainWindow.show();
+      } },
+    { label: 'Quit', click:  function(){
+        app.isQuiting = true;
+        app.quit();
+      } }
+  ]);
+  tray.setToolTip('This is my application.')
+  tray.setContextMenu(contextMenu)
+}
 
-app.on('activate', function () {
-// On macOS it's common to re-create a window in the app when the
-// dock icon is clicked and there are no other windows open.
-if (BrowserWindow.getAllWindows().length === 0) createWindow()
-})
-app.on('window-all-closed', function () {
-
-  // KILLING PYTHON SERVER
-  //DEV
-  // ps.childProcess.kill();
-  const { exec } = require('child_process');
+function killServerProd() {
   exec('taskkill /f /t /im server.exe', (err, stdout, stderr) => {
     if (err) {
       console.log(err)
@@ -80,8 +63,39 @@ app.on('window-all-closed', function () {
     console.log(`stdout: ${stdout}`);
     console.log(`stderr: ${stderr}`);
   });
-  if (process.platform !== 'darwin') app.quit()
-})
+}
 
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.
+function killServerDev() {
+   backendServer.childProcess.kill();
+}
+
+function setStartBackendServer() {
+  if (isDev) {
+    backendServer = new pyshell.PythonShell('./backend/server.py')
+  } else {
+    const script = path.join(__dirname, 'server.exe')
+    backendServer = require('child_process').execFile(script)
+  }
+}
+
+function getUrl() {
+  return isDev ? 'http://localhost:3000' : `file://${path.join(__dirname, '../build/index.html')}`
+}
+
+function handleMinimize(e) {
+  e.preventDefault();
+  mainWindow.hide();
+}
+
+function handleClose(e) {
+    if(!app.isQuiting){
+      e.preventDefault();
+      mainWindow.hide();
+    }
+    return false;
+}
+
+function handleQuit () {
+  isDev ? killServerDev() : killServerProd()
+  if (process.platform !== 'darwin') app.quit()
+}
